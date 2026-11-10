@@ -16,7 +16,7 @@ The binary is produced at `./bin/forage-mcp`.
 
 ### Requirements
 
-- Go 1.24+ (for building from source)
+- Go 1.25+ (for building from source)
 - A reachable Forage instance
 
 ## Configuration

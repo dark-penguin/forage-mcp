@@ -15,7 +15,7 @@ This server acts as a thin, fast wrapper around Forage's Native API — no proxy
 - Provide two well-defined MCP tools: `forage_search` and `forage_extract`
 - Use only Forage's **Native Hermes-compatible** API (`/search`, `/extract`)
 - Communicate via **stdio transport** (suitable for Claude Desktop, Agent Zero, and CLI integration)
-- Written in **Go 1.24**, compiled to a single standalone binary
+- Written in **Go 1.25**, compiled to a single standalone binary
 - Built on the **official Go MCP SDK** (`github.com/modelcontextprotocol/go-sdk`)
 - Accept configuration via environment variables and CLI arguments using `github.com/spf13/pflag`
 - Include comprehensive plaintext logging to stderr with configurable verbosity
@@ -31,7 +31,7 @@ This server acts as a thin, fast wrapper around Forage's Native API — no proxy
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Language | Go 1.24 | Fast compilation, small binary, strong stdlib |
+| Language | Go 1.25 | Fast compilation, small binary, strong stdlib |
 | Transport | stdio | Standard for MCP servers; works with Claude Desktop, Agent Zero, CLI tools |
 | API Mode | Native Hermes-compatible only | Simpler contract; Firecrawl compatibility is out of scope |
 | Binary Name | `forage-mcp` | Clear purpose, consistent naming convention |
@@ -162,7 +162,7 @@ forage-mcp/
 │   ├── tools_search.go  // forage_search tool handler
 │   ├── tools_extract.go // forage_extract tool handler
 │   └── logging.go       // slog setup (stderr, plaintext)
-├── go.mod               // module github.com/dark-penguin/forage-mcp, Go 1.24
+├── go.mod               // module github.com/dark-penguin/forage-mcp, Go 1.25
 ├── go.sum
 ├── Makefile             // Build targets: make build, make test
 └── README.md
