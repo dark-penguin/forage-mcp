@@ -66,14 +66,10 @@ func TestForageSearchHandler(t *testing.T) {
 	}))
 	defer server.Close()
 
-	origClient := forageClient
-	origConfig := serverConfig
-	forageClient = NewForageClient(server.URL, "", 10)
-	serverConfig = &Config{ForageURL: server.URL, TimeoutSeconds: 10}
-	defer func() {
-		forageClient = origClient
-		serverConfig = origConfig
-	}()
+	a := &app{
+		cfg:    &Config{ForageURL: server.URL, TimeoutSeconds: 10},
+		client: NewForageClient(server.URL, "", 10),
+	}
 
 	tests := []struct {
 		name     string
@@ -97,7 +93,7 @@ func TestForageSearchHandler(t *testing.T) {
 			if err := json.Unmarshal([]byte(tt.argsJSON), &args); err != nil {
 				t.Fatalf("failed to unmarshal test args: %v", err)
 			}
-			_, _, err := forageSearchHandler(context.Background(), nil, args)
+			_, _, err := a.searchHandler(context.Background(), nil, args)
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error, got nil")
@@ -116,7 +112,7 @@ func TestForageSearchHandler(t *testing.T) {
 	t.Run("no_cache=true sends Cache-Control header", func(t *testing.T) {
 		gotCacheCtrl = ""
 		args := searchToolArgs{Query: "test", NoCache: true}
-		_, _, err := forageSearchHandler(context.Background(), nil, args)
+		_, _, err := a.searchHandler(context.Background(), nil, args)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -128,7 +124,7 @@ func TestForageSearchHandler(t *testing.T) {
 	t.Run("no_cache=false omits Cache-Control header", func(t *testing.T) {
 		gotCacheCtrl = ""
 		args := searchToolArgs{Query: "test", NoCache: false}
-		_, _, err := forageSearchHandler(context.Background(), nil, args)
+		_, _, err := a.searchHandler(context.Background(), nil, args)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -144,9 +140,9 @@ func TestForageSearchHandler(t *testing.T) {
 		}))
 		defer errServer.Close()
 
-		forageClient = NewForageClient(errServer.URL, "", 10)
+		a.client = NewForageClient(errServer.URL, "", 10)
 		args := searchToolArgs{Query: "test"}
-		_, _, err := forageSearchHandler(context.Background(), nil, args)
+		_, _, err := a.searchHandler(context.Background(), nil, args)
 		if err == nil {
 			t.Error("expected error, got nil")
 		}

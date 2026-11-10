@@ -139,14 +139,10 @@ func TestForageExtractHandler(t *testing.T) {
 	}))
 	defer server.Close()
 
-	origClient := forageClient
-	origConfig := serverConfig
-	forageClient = NewForageClient(server.URL, "", 10)
-	serverConfig = &Config{ForageURL: server.URL, TimeoutSeconds: 10}
-	defer func() {
-		forageClient = origClient
-		serverConfig = origConfig
-	}()
+	a := &app{
+		cfg:    &Config{ForageURL: server.URL, TimeoutSeconds: 10},
+		client: NewForageClient(server.URL, "", 10),
+	}
 
 	tests := []struct {
 		name     string
@@ -211,7 +207,7 @@ func TestForageExtractHandler(t *testing.T) {
 				t.Fatalf("failed to unmarshal test args: %v", err)
 			}
 
-			_, _, err := forageExtractHandler(context.Background(), nil, args)
+			_, _, err := a.extractHandler(context.Background(), nil, args)
 
 			if tt.wantErr {
 				if err == nil {
@@ -232,7 +228,7 @@ func TestForageExtractHandler(t *testing.T) {
 	t.Run("no_cache=true sends Cache-Control header", func(t *testing.T) {
 		gotCacheCtrl = ""
 		args := extractToolArgs{URLs: []string{"https://example.com"}, NoCache: true}
-		_, _, err := forageExtractHandler(context.Background(), nil, args)
+		_, _, err := a.extractHandler(context.Background(), nil, args)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -249,9 +245,9 @@ func TestForageExtractHandler(t *testing.T) {
 		}))
 		defer errServer.Close()
 
-		forageClient = NewForageClient(errServer.URL, "", 10)
+		a.client = NewForageClient(errServer.URL, "", 10)
 		args := extractToolArgs{URLs: []string{"https://example.com"}}
-		_, _, err := forageExtractHandler(context.Background(), nil, args)
+		_, _, err := a.extractHandler(context.Background(), nil, args)
 		if err == nil {
 			t.Error("expected error, got nil")
 		}

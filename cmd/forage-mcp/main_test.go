@@ -38,15 +38,10 @@ func TestEndToEnd(t *testing.T) {
 	}))
 	defer forageServer.Close()
 
-	// Set up package-level vars
-	origClient := forageClient
-	origConfig := serverConfig
-	forageClient = NewForageClient(forageServer.URL, "", 10)
-	serverConfig = &Config{ForageURL: forageServer.URL, TimeoutSeconds: 10}
-	defer func() {
-		forageClient = origClient
-		serverConfig = origConfig
-	}()
+	a := &app{
+		cfg:    &Config{ForageURL: forageServer.URL, TimeoutSeconds: 10},
+		client: NewForageClient(forageServer.URL, "", 10),
+	}
 
 	// Create MCP server with tools
 	server := mcp.NewServer(
@@ -56,11 +51,11 @@ func TestEndToEnd(t *testing.T) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "forage_search",
 		Description: "Search the web using Forage",
-	}, forageSearchHandler)
+	}, a.searchHandler)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "forage_extract",
 		Description: "Extract content from URLs using Forage",
-	}, forageExtractHandler)
+	}, a.extractHandler)
 
 	ctx := context.Background()
 

@@ -54,8 +54,8 @@ func validateSearchArgs(args *searchToolArgs) error {
 	return nil
 }
 
-// forageSearchHandler is the MCP tool handler for forage_search.
-func forageSearchHandler(ctx context.Context, req *mcp.CallToolRequest, input searchToolArgs) (*mcp.CallToolResult, searchToolResult, error) {
+// searchHandler is the MCP tool handler for forage_search.
+func (a *app) searchHandler(ctx context.Context, req *mcp.CallToolRequest, input searchToolArgs) (*mcp.CallToolResult, searchToolResult, error) {
 	slog.Info("incoming request", "tool", "forage_search", "query", input.Query)
 
 	if err := validateSearchArgs(&input); err != nil {
@@ -69,7 +69,7 @@ func forageSearchHandler(ctx context.Context, req *mcp.CallToolRequest, input se
 		Engines:  input.Engines,
 	}
 
-	result, err := forageClient.Search(ctx, searchParams, input.NoCache)
+	result, err := a.client.Search(ctx, searchParams, input.NoCache)
 	if err != nil {
 		return nil, searchToolResult{}, err
 	}

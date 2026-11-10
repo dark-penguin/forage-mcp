@@ -72,8 +72,8 @@ func validateExtractArgs(args *extractToolArgs) error {
 	return nil
 }
 
-// forageExtractHandler is the MCP tool handler for forage_extract.
-func forageExtractHandler(ctx context.Context, req *mcp.CallToolRequest, input extractToolArgs) (*mcp.CallToolResult, extractToolResult, error) {
+// extractHandler is the MCP tool handler for forage_extract.
+func (a *app) extractHandler(ctx context.Context, req *mcp.CallToolRequest, input extractToolArgs) (*mcp.CallToolResult, extractToolResult, error) {
 	slog.Info("incoming request", "tool", "forage_extract", "urls", len(input.URLs))
 
 	if err := validateExtractArgs(&input); err != nil {
@@ -81,7 +81,7 @@ func forageExtractHandler(ctx context.Context, req *mcp.CallToolRequest, input e
 	}
 
 	// Resolve effective timeout: per-request if valid, else global
-	effectiveTimeout := serverConfig.TimeoutSeconds
+	effectiveTimeout := a.cfg.TimeoutSeconds
 	if input.Timeout != nil {
 		effectiveTimeout = *input.Timeout
 	}
@@ -99,7 +99,7 @@ func forageExtractHandler(ctx context.Context, req *mcp.CallToolRequest, input e
 		Engine:          input.Engine,
 	}
 
-	result, err := forageClient.Extract(ctx, extractParams, input.NoCache)
+	result, err := a.client.Extract(ctx, extractParams, input.NoCache)
 	if err != nil {
 		return nil, extractToolResult{}, err
 	}

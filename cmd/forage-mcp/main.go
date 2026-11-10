@@ -8,10 +8,10 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-var (
-	serverConfig  *Config
-	forageClient  *ForageClient
-)
+type app struct {
+	cfg    *Config
+	client *ForageClient
+}
 
 func main() {
 	cfg, err := LoadConfig()
@@ -19,14 +19,16 @@ func main() {
 		slog.Error("configuration failed", "error", err)
 		os.Exit(1)
 	}
-	serverConfig = cfg
 
 	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: cfg.LogLevel,
 	})
 	slog.SetDefault(slog.New(handler))
 
-	forageClient = NewForageClient(cfg.ForageURL, cfg.APIKey, cfg.TimeoutSeconds)
+	a := &app{
+		cfg:    cfg,
+		client: NewForageClient(cfg.ForageURL, cfg.APIKey, cfg.TimeoutSeconds),
+	}
 
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -39,12 +41,12 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "forage_search",
 		Description: "Search the web using Forage's configured search provider (Google, Bing, Yahoo, DuckDuckGo, Brave). Returns structured results with title, URL, description, and position.",
-	}, forageSearchHandler)
+	}, a.searchHandler)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "forage_extract",
 		Description: "Extract clean content from web pages using Forage's hybrid static + browser extraction pipeline. Returns markdown, HTML, or raw content per URL.",
-	}, forageExtractHandler)
+	}, a.extractHandler)
 
 	slog.Info("starting forage-mcp server", "forage_url", cfg.ForageURL, "timeout", cfg.TimeoutSeconds)
 
