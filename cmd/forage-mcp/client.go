@@ -125,7 +125,7 @@ func (c *ForageClient) doRequest(ctx context.Context, method, path string, body 
 
 	cacheStatus := resp.Header.Get("X-Forage-Cache")
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20)) // 50 MB cap
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read response body: %w", err)
 	}
