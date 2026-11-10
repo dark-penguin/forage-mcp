@@ -1,0 +1,52 @@
+package main
+
+import (
+	"context"
+	"log/slog"
+	"os"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+var (
+	serverConfig  *Config
+	forageClient  *ForageClient
+)
+
+func main() {
+	cfg, err := LoadConfig()
+	if err != nil {
+		slog.Error("configuration failed", "error", err)
+		os.Exit(1)
+	}
+	serverConfig = cfg
+
+	InitLogging(cfg.LogLevel)
+
+	forageClient = NewForageClient(cfg.ForageURL, cfg.APIKey, cfg.TimeoutSeconds)
+
+	server := mcp.NewServer(
+		&mcp.Implementation{
+			Name:    "forage-mcp",
+			Version: "v1.0.0",
+		},
+		nil,
+	)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "forage_search",
+		Description: "Search the web using Forage's configured search provider (Google, Bing, Yahoo, DuckDuckGo, Brave). Returns structured results with title, URL, description, and position.",
+	}, forageSearchHandler)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "forage_extract",
+		Description: "Extract clean content from web pages using Forage's hybrid static + browser extraction pipeline. Returns markdown, HTML, or raw content per URL.",
+	}, forageExtractHandler)
+
+	slog.Info("starting forage-mcp server", "forage_url", cfg.ForageURL, "timeout", cfg.TimeoutSeconds)
+
+	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
+		slog.Error("server failed", "error", err)
+		os.Exit(1)
+	}
+}
