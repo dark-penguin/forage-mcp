@@ -21,7 +21,10 @@ func main() {
 	}
 	serverConfig = cfg
 
-	InitLogging(cfg.LogLevel)
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: cfg.LogLevel,
+	})
+	slog.SetDefault(slog.New(handler))
 
 	forageClient = NewForageClient(cfg.ForageURL, cfg.APIKey, cfg.TimeoutSeconds)
 
