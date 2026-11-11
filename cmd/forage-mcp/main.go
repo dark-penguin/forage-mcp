@@ -30,6 +30,10 @@ func main() {
 		client: NewForageClient(cfg.ForageURL, cfg.APIKey, cfg.TimeoutSeconds),
 	}
 
+	if err := a.client.Health(context.Background()); err != nil {
+		slog.Warn("forage instance not reachable at startup", "url", cfg.ForageURL, "error", err)
+	}
+
 	server := mcp.NewServer(
 		&mcp.Implementation{
 			Name:    "forage-mcp",

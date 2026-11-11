@@ -140,6 +140,34 @@ func (c *ForageClient) doRequest(ctx context.Context, method, path string, body 
 	return json.RawMessage(respBody), cacheStatus, nil
 }
 
+// Health checks whether the Forage instance is reachable by making a GET request
+// to the base URL with a short timeout. It returns an error if the instance is
+// unreachable or returns a non-2xx status code.
+func (c *ForageClient) Health(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create health request: %w", err)
+	}
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("forage health check failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("forage health check returned HTTP %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // Search performs a web search via Forage's /search endpoint.
 func (c *ForageClient) Search(ctx context.Context, params SearchParams, noCache bool) (*SearchResult, error) {
 	extraHeaders := make(map[string]string)
