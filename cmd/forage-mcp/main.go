@@ -8,6 +8,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+var version = "v1.0.0"
+
 type app struct {
 	cfg    *Config
 	client *ForageClient
@@ -37,7 +39,7 @@ func main() {
 	server := mcp.NewServer(
 		&mcp.Implementation{
 			Name:    "forage-mcp",
-			Version: "v1.0.0",
+			Version: version,
 		},
 		nil,
 	)
