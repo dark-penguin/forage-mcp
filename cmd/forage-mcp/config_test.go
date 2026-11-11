@@ -99,30 +99,31 @@ func TestLoadConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Save and restore env vars
-			var savedEnv []string
+			// Override os.Args for pflag parsing
+			origArgs := os.Args
+			os.Args = append([]string{"forage-mcp"}, tt.args...)
+			t.Cleanup(func() { os.Args = origArgs })
+
+			// Save and restore env vars via t.Cleanup for panic safety
 			for k, v := range tt.env {
-				savedEnv = append(savedEnv, k)
+				if old, ok := os.LookupEnv(k); ok {
+					t.Cleanup(func() { os.Setenv(k, old) })
+				} else {
+					t.Cleanup(func() { os.Unsetenv(k) })
+				}
 				os.Setenv(k, v)
 			}
 			// Clear env vars not in the test
 			for _, key := range []string{"FORAGE_URL", "FORAGE_API_KEY", "LOG_LEVEL"} {
 				if _, ok := tt.env[key]; !ok {
+					if old, wasSet := os.LookupEnv(key); wasSet {
+						t.Cleanup(func() { os.Setenv(key, old) })
+					}
 					os.Unsetenv(key)
 				}
 			}
 
-			// Override os.Args for pflag parsing
-			origArgs := os.Args
-			os.Args = append([]string{"forage-mcp"}, tt.args...)
-
 			cfg, err := LoadConfig()
-
-			os.Args = origArgs
-			// Restore env
-			for _, k := range savedEnv {
-				os.Unsetenv(k)
-			}
 
 			if tt.wantErr {
 				if err == nil {
