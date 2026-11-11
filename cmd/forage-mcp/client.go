@@ -112,12 +112,12 @@ func (c *ForageClient) doRequest(ctx context.Context, method, path string, body 
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, "", fmt.Errorf("request timed out (context deadline exceeded)")
+		}
 		var netErr net.Error
 		if errors.As(err, &netErr) && netErr.Timeout() {
 			return nil, "", fmt.Errorf("request timed out after %d seconds", int(c.httpClient.Timeout.Seconds()))
-		}
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, "", fmt.Errorf("request cancelled (deadline exceeded)")
 		}
 		return nil, "", fmt.Errorf("forage request failed: %w", err)
 	}
