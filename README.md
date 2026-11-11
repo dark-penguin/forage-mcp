@@ -43,6 +43,8 @@ The binary is produced at `./bin/forage-mcp`.
 
 CLI flags take precedence over environment variables.
 
+> **Note:** Prefer the `FORAGE_API_KEY` environment variable over the `-k` flag to avoid exposing the API key in process listings (`ps aux`).
+
 ## Usage
 
 ### Claude Desktop
@@ -171,6 +173,12 @@ make test
 # Clean build artifacts
 make clean
 ```
+
+## Troubleshooting
+
+- **"Connection refused"** → Verify Forage is running and `FORAGE_URL` is correct. Check that the port is reachable.
+- **"HTTP 401 Unauthorized"** → API key mismatch or authentication not enabled on your Forage instance. Verify `FORAGE_API_KEY` matches the key configured in Forage.
+- **"Request timed out"** → Increase the timeout with `-t <seconds>` or check that your Forage browser pool is healthy and has available workers.
 
 ## License
 
