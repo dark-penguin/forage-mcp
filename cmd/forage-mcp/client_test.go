@@ -274,3 +274,54 @@ func TestForageClientContextCancellation(t *testing.T) {
 		t.Error("expected timeout error, got nil")
 	}
 }
+
+func TestForageClientTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Sleep longer than the client's 50ms timeout
+		time.Sleep(200 * time.Millisecond)
+		w.Header().Set("X-Forage-Cache", "miss")
+		w.Write([]byte(`{"success":true}`))
+	}))
+	defer server.Close()
+
+	// Construct client directly with a 50ms timeout (NewForageClient only accepts whole seconds)
+	client := &ForageClient{
+		httpClient: &http.Client{Timeout: 50 * time.Millisecond},
+		baseURL:    server.URL,
+	}
+
+	_, _, err := client.doRequest(context.Background(), http.MethodPost, "/search", map[string]string{"query": "test"}, nil)
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if !strings.Contains(err.Error(), "timed out") {
+		t.Errorf("error should contain \"timed out\", got: %v", err)
+	}
+}
+
+func TestForageClientLargeResponseBody(t *testing.T) {
+	const cap = 50 << 20 // 50 MB, matches the LimitReader in doRequest
+
+	// Payload just over the 50MB cap to confirm truncation
+	overLimit := make([]byte, cap+1024)
+	for i := range overLimit {
+		overLimit[i] = byte(i % 256)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Forage-Cache", "miss")
+		w.Write(overLimit)
+	}))
+	defer server.Close()
+
+	client := NewForageClient(server.URL, "", 10)
+
+	raw, _, err := client.doRequest(context.Background(), http.MethodPost, "/search", map[string]string{"query": "test"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// LimitReader caps the body at exactly 50MB
+	if len(raw) != cap {
+		t.Errorf("response body length = %d, want %d (50MB cap)", len(raw), cap)
+	}
+}
