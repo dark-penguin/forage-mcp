@@ -1,9 +1,7 @@
-BINARY := bin/forage-mcp
-
 .PHONY: build test clean
 
 build:
-	go build -o $(BINARY) ./cmd/forage-mcp
+	go build -o ./bin/forage-mcp ./cmd/forage-mcp
 
 test:
 	go test ./...
