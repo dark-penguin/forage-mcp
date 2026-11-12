@@ -2,7 +2,7 @@
 
 ## 1. Project scaffolding and dependencies
 
-- [ ] 1.1 Initialize Go module `github.com/dark-penguin/forage-mcp` with Go 1.24, create the `cmd/forage-mcp/` directory, and verify `go mod init` succeeds and `go build ./...` compiles an empty main package
+- [ ] 1.1 Initialize Go module `github.com/dark-penguin/forage-mcp` with Go 1.25, create the `cmd/forage-mcp/` directory, and verify `go mod init` succeeds and `go build ./...` compiles an empty main package
 - [ ] 1.2 Add dependencies `github.com/modelcontextprotocol/go-sdk` and `github.com/spf13/pflag` to `go.mod`, run `go mod tidy`, and verify both packages are listed in `go.mod` and `go.sum`
 - [ ] 1.3 Create a `Makefile` with `build` (compiles `cmd/forage-mcp` to `./bin/forage-mcp`) and `test` (runs `go test ./...`) targets, and verify `make build` produces the binary and `make test` runs without errors on an empty test suite
 - [ ] 1.4 Create a `README.md` with project description, installation instructions, configuration reference (env vars and CLI flags), and usage examples for Claude Desktop and Agent Zero, and verify the documented commands match the actual flag names and defaults

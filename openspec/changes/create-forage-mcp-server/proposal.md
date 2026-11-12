@@ -6,7 +6,7 @@ AI agents (Claude Desktop, Agent Zero, and any MCP-compatible client) need a rel
 
 ## What Changes
 
-- Introduce a new Go 1.24 binary `forage-mcp` that acts as an MCP server over **stdio** and exposes two tools:
+- Introduce a new Go 1.25 binary `forage-mcp` that acts as an MCP server over **stdio** and exposes two tools:
   - `forage_search` — web search via Forage's `/search` endpoint
   - `forage_extract` — clean content extraction via Forage's `/extract` endpoint
 - Accept configuration through environment variables (`FORAGE_URL`, `FORAGE_API_KEY`) and CLI flags (`pflag`): `-u/--forage-url`, `-k/--forage-api-key`, `-t/--timeout`, `-v/--verbose`, `-q/--quiet`.

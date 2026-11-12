@@ -28,7 +28,7 @@ Key constraints shaping the design:
 
 ### Language and SDK
 
-**Decision:** Go 1.24 with the official `github.com/modelcontextprotocol/go-sdk` for MCP server scaffolding and `github.com/spf13/pflag` for CLI flags.
+**Decision:** Go 1.25 with the official `github.com/modelcontextprotocol/go-sdk` for MCP server scaffolding and `github.com/spf13/pflag` for CLI flags.
 
 **Rationale:**
 - Go produces a single static binary with no runtime dependencies, ideal for containerized or CLI deployment.
