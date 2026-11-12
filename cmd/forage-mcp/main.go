@@ -8,7 +8,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-var version = "v1.0.0"
+var version = "dev"
 
 type app struct {
 	cfg    *Config
