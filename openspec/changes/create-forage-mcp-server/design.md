@@ -42,7 +42,7 @@ Key constraints shaping the design:
 
 ### Project layout
 
-**Decision:** All code lives under `cmd/forage-mcp/` as a flat set of focused files. No `pkg/` or `internal/` directories.
+**Decision:** All code lives under `cmd/forage-mcp/` (module `github.com/dark-penguin/forage-mcp`) as a flat set of focused files. No `pkg/` or `internal/` directories.
 
 **Rationale:**
 - This is a single small binary; nothing is imported as a library by other Go packages, so `pkg/` would be misleading.
@@ -57,7 +57,6 @@ Key constraints shaping the design:
 | `client.go` | Define `ForageClient` wrapping `*http.Client`; implement `Search(ctx, params)` and `Extract(ctx, params)` methods that build the HTTP request (headers, body, timeout), send it, read `X-Forage-Cache`, and decode the JSON response into typed structs. |
 | `tools_search.go` | Implement the `forage_search` tool handler: validate parameters, call `client.Search`, map the result to the MCP tool result schema. |
 | `tools_extract.go` | Implement the `forage_extract` tool handler: validate parameters (including per-request timeout override), call `client.Extract`, map the result to the MCP tool result schema. |
-| `logging.go` | Set up `slog` with a text handler writing to stderr; expose `InitLogging(level)` called from `main.go`. |
 
 **Alternatives considered:**
 - *Separate `internal/forage/` package for the HTTP client*: would be appropriate if the client were reused by other binaries, but at this scope it adds indirection without benefit.
@@ -115,7 +114,7 @@ Key constraints shaping the design:
 
 ### Test strategy
 
-**Decision:** Table-driven Go tests using `net/http/httptest` to mock the Forage API. Each test file mirrors its source file (`config_test.go`, `client_test.go`, `tools_search_test.go`, `tools_extract_test.go`).
+**Decision:** Table-driven Go tests using `net/http/httptest` to mock the Forage API. Each test file mirrors its source file (`config_test.go`, `client_test.go`, `tools_search_test.go`, `tools_extract_test.go`), plus `main_test.go` for end-to-end MCP protocol verification and `concurrency_test.go` for parallel handler invocation safety.
 
 **Rationale:**
 - `httptest.NewServer` provides a real HTTP server on a local port, so the HTTP client code is exercised end-to-end without external dependencies.

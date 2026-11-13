@@ -2,7 +2,7 @@
 
 ## Why
 
-AI agents (Claude Desktop, Agent Zero, and any MCP-compatible client) need a reliable way to perform web searches and extract clean page content from the self-hosted [Forage](https://github.com/aldemaroc/forage) service. Today there is no Model Context Protocol (MCP) bridge for Forage's Native API, so agents cannot use its multi-provider search (Google, Bing, Yahoo, DuckDuckGo, Brave, SearXNG) or its hybrid static + browser extraction pipeline without custom glue code per client.
+AI agents (Claude Desktop, Agent Zero, and any MCP-compatible client) need a reliable way to perform web searches and extract clean page content from the self-hosted [Forage](https://github.com/aldemaroc/forage) service. Today there is no Model Context Protocol (MCP) bridge for Forage's Native API, so agents cannot use its multi-provider search (Google, Bing, Yahoo, DuckDuckGo, Brave) or its hybrid static + browser extraction pipeline without custom glue code per client.
 
 ## What Changes
 
