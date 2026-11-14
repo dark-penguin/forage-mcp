@@ -1,0 +1,142 @@
+name: Go Multi-Platform Build+Release
+
+env:
+  REPO_NAME: forage-mcp
+  # Gitea does not have repository.name - only repository.full_name, with owner!
+
+on:
+  push:
+    tags:
+      - v*
+    #branches:
+    #  - main
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      # With this, one failed platform does not abort others
+      matrix:
+        #os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest]
+        include:
+          - os: ubuntu-latest
+            suffix: linux-amd64.tgz
+            format: tar
+          #- os: windows-latest
+          #  suffix: windows-amd64.zip
+          #  format: zip
+          #- os: macos-latest
+          #  suffix: darwin-amd64.tgz
+          #  format: tar
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Debug Context Variables
+      run: |
+        echo "github.ref        = ${{ github.ref }}"
+        echo "github.ref_type   = ${{ github.ref_type }}"
+        echo "github.ref_name   = ${{ github.ref_name }}"
+        echo "github.event_name = ${{ github.event_name }}"
+        echo "github.base_ref   = ${{ github.base_ref }}"
+        echo "github.head_ref   = ${{ github.head_ref }}"
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.25'
+        cache: true
+
+    - name: Test
+      run: make test
+
+    - name: Build
+      run: make build
+
+    - name: Archive (Linux/Mac)
+      if: matrix.format == 'tar'
+      run: cd bin && tar zcvf ../${{ env.REPO_NAME }}-${{ matrix.suffix }} *
+
+    - name: Archive (Windows)
+      if: matrix.format == 'zip'
+      run: cd bin && powershell Compress-Archive -Path * -DestinationPath ../${{ env.REPO_NAME }}-${{ matrix.suffix }}
+
+    # This will automatically zip the files!
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.REPO_NAME }}-${{ matrix.suffix }}.zip
+        path: ${{ env.REPO_NAME }}-${{ matrix.suffix }}
+        retention-days: 1
+
+  release:
+    if: github.ref_type == 'tag'
+
+    needs: build
+    runs-on: ubuntu-latest
+
+    # Optionally scope the token to not give it full repo owner permissions
+    permissions:
+      contents: read
+      releases: write
+
+    steps:
+    - name: Install gitea-cli (gt)
+      run: |
+        #URL="https://dl.gitea.com/gitea-cli"
+        URL="http://github-cache.socket.lc/cache"
+        VERSION=$(curl -fsSL $URL/version.json | jq -r '.latest.version')
+        ARCH=$(dpkg --print-architecture)
+        #curl -fsSL -o /tmp/gitea-cli.deb "${URL}/${VERSION}/gitea-cli_${VERSION}_${ARCH}.deb"
+        curl -fsSL -o /tmp/gitea-cli.deb "${URL}/gitea-cli_${VERSION}_${ARCH}.deb"
+        apt-get install -y /tmp/gitea-cli.deb
+
+    # gh needs this to see commit messages
+    - name: Checkout code
+      uses: actions/checkout@v4
+      #with:
+      #  fetch-depth: 0
+      # This means "with all history"! But not necessary for changelogs!
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: dist/
+    # This automatically extracts files into dist/myproject-linux-amd64.tar.gz.zip/myproject-linux-amd64.tar.gz !
+
+    - name: Move artifacts
+      run: |
+        cd dist
+        ls -lha  # DEBUG
+        for i in * ; do mv "$i"/* . ; rmdir "$i"; done
+
+    - name: Generate release notes
+      run: |
+        PREV_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
+        if [ -n "$PREV_TAG" ]; then
+          git log --oneline "${PREV_TAG}..${{ github.ref_name }}" > NOTES.md
+        else
+          git log --oneline ${{ github.ref_name }} > NOTES.md
+        fi
+
+    # See https://cli.github.com/manual/gh_release_create
+    - name: Create Release
+      env:
+        GITEA_TOKEN: ${{ gitea.token }}
+        GITEA_CLI_HOST: ${{ gitea.server_url }}
+        GITEA_CLI_REPO: ${{ gitea.repository }}
+      run: >
+        gt release create ${{ github.ref_name }}
+        --title "${{ github.ref_name }}"
+        --notes-file NOTES.md
+        ./dist/*
+      # (--generate-notes - Gitea does NOT support auto-generated notes!)
+      # --notes-from-tag - just put the commit message only for this tag in the notes
+      # -F, --notes-file <file> - read release notes from file (use "-" to read from standard input)
+      # -n, --notes <string> - provide notes manually
+      # -d, --draft - save the release as a draft instead of publishing it
+      # -p, --prerelease - mark the release as a prerelease
