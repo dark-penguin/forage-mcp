@@ -5,30 +5,47 @@ env:
 
 on:
   push:
-    tags:  # v*** to publish, v***-pre - prerelease
+    tags:  # v*** to publish, v***-<anything> - prerelease
       - v*
-    #branches:
-    #  - main
+    branches:  # For tags, publish them; for normal commits, just build and test
+      - main
 
 jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check that Actions workflows are the same except some lines commented out
+      run: |
+        # Add '-u' to see more lines around the changes
+        echo -e "\nOffending differences:\n======================"
+        if diff \
+          <(sed -E 's/^(\s*)# ?/\1/' .gitea/workflows/go-build.yml) \
+          <(sed -E 's/^(\s*)# ?/\1/' .github/workflows/go-build.yml)
+        then echo "None"
+        else echo -e "\eWorkflows are different!"; exit 1
+        fi
+        echo -e "\nAllowed differences:\n===================="
+        diff .gitea/workflows/go-build.yml .github/workflows/go-build.yml || true
+
   build:
+    needs: checks
+    runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
-      # With this, one failed platform does not abort others
+      # fail-fast: false  # With this, one failed platform does not abort others
       matrix:
-        #os: [ubuntu-latest, windows-latest, macos-latest]
-        #os: [ubuntu-latest]
         include:
           - os: ubuntu-latest
             suffix: linux-amd64.tgz
             format: tar
-          #- os: windows-latest
-          #  suffix: windows-amd64.zip
-          #  format: zip
-          #- os: macos-latest
-          #  suffix: darwin-amd64.tgz
-          #  format: tar
-    runs-on: ${{ matrix.os }}
+          - os: windows-latest
+            suffix: windows-amd64.zip
+            format: zip
+          - os: macos-latest
+            suffix: darwin-amd64.tgz
+            format: tar
 
     steps:
     - name: "DEBUG: dump context variables"
@@ -68,7 +85,7 @@ jobs:
       run: |
         $repo = $env:GITHUB_REPOSITORY.Split('/')[-1]  # Strip owner name
         "REPO_NAME=$repo" >> $env:GITHUB_ENV           # Save into env-file
-        cd bin && powershell Compress-Archive -Path * -DestinationPath "$repo-${{ matrix.suffix }}"
+        cd bin && powershell Compress-Archive -Path * -DestinationPath "../$repo-${{ matrix.suffix }}"
 
     # This will automatically zip the files before uploading!
     - name: Upload artifact
@@ -77,10 +94,11 @@ jobs:
         name: ${{ env.REPO_NAME }}-${{ matrix.suffix }}.zip
         path: ${{ env.REPO_NAME }}-${{ matrix.suffix }}
         retention-days: 1
+        if-no-files-found: error
 
 
   release:
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag'  # For tags, publish them; for normal commits, just build and test
 
     needs: build
     runs-on: ubuntu-latest
@@ -89,12 +107,10 @@ jobs:
       contents: write
 
     steps:
-    # gh needs this to see commit messages
-    - name: Checkout code
+    - name: Checkout code  # For the changelogs!
       uses: actions/checkout@v4
-      #with:
-      #  fetch-depth: 0
-      # This means "with all history"! But not necessary for changelogs!
+      with:
+        fetch-depth: 0  # Default: 1 (--depth 1); we need history for changelogs!
 
     - name: Generate release notes
       run: |
@@ -132,5 +148,5 @@ jobs:
         files: ./dist/*
         # generate_release_notes: true  # Not supported by Gitea!
         body_path: NOTES.md
-        prerelease: ${{ endsWith(github.ref_name, '-pre') }}  # true - mark the release as a prerelease
+        prerelease: ${{ contains(github.ref_name, '-') }}  # true - mark the release as a prerelease
         # draft: true  # Save the release as a draft instead of publishing it
