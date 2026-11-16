@@ -1,4 +1,7 @@
-name: Go Multi-Platform Build+Release
+name: Go binaries only
+
+env:
+  GO_VERSION: "1.25"
 
 on:
   push:
@@ -13,22 +16,22 @@ jobs:
       fail-fast: false
       # With this, one failed platform does not abort others
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        #os: [ubuntu-latest, windows-latest, macos-latest]
+        #os: [ubuntu-latest]
         include:
           - os: ubuntu-latest
-            artifact_name: ${{ github.event.repository.name }}-linux-amd64.tgz
+            suffix: linux-amd64.tgz
             format: tar
-          - os: windows-latest
-            artifact_name: ${{ github.event.repository.name }}-windows-amd64.zip
-            format: zip
-          - os: macos-latest
-            artifact_name: ${{ github.event.repository.name }}-darwin-amd64.tgz
-            format: tar
-
+          #- os: windows-latest
+          #  suffix: windows-amd64.zip
+          #  format: zip
+          #- os: macos-latest
+          #  suffix: darwin-amd64.tgz
+          #  format: tar
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Debug Context Variables
+    - name: "DEBUG: dump context variables"
       run: |
         echo "github.ref        = ${{ github.ref }}"
         echo "github.ref_type   = ${{ github.ref_type }}"
@@ -43,7 +46,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.25'
+        go-version: "${{ env.GO_VERSION }}"
         cache: true
 
     - name: Test
@@ -54,25 +57,35 @@ jobs:
 
     - name: Archive (Linux/Mac)
       if: matrix.format == 'tar'
-      run: cd bin && tar zcvf ../${{ matrix.artifact_name }} *
+      run: |
+        REPO_NAME="${GITHUB_REPOSITORY#*/}"                     # Strip owner name
+        echo "REPO_NAME=${REPO_NAME}" | tee -a "${GITHUB_ENV}"  # Save into env-file (NO '' HERE!)
+        cd bin && tar zcvf ../${REPO_NAME}-${{ matrix.suffix }} *
 
     - name: Archive (Windows)
       if: matrix.format == 'zip'
-      run: cd bin && powershell Compress-Archive -Path * -DestinationPath ../${{ matrix.artifact_name }}
+      run: |
+        $repo = $env:GITHUB_REPOSITORY.Split('/')[-1]  # Strip owner name
+        "REPO_NAME=$repo" >> $env:GITHUB_ENV           # Save into env-file
+        cd bin && powershell Compress-Archive -Path * -DestinationPath "$repo-${{ matrix.suffix }}"
 
-    # This will automatically zip the files!
+    # This will automatically zip the files before uploading!
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.artifact_name }}.zip
-        path: ${{ matrix.artifact_name }}
+        name: ${{ env.REPO_NAME }}-${{ matrix.suffix }}.zip
+        path: ${{ env.REPO_NAME }}-${{ matrix.suffix }}
         retention-days: 1
+
 
   release:
     if: github.ref_type == 'tag'
 
     needs: build
     runs-on: ubuntu-latest
+
+    permissions:  # Restrict the release job to only "contents" just in case (optional)
+      contents: write
 
     steps:
     # gh needs this to see commit messages
@@ -90,11 +103,56 @@ jobs:
 
     - name: Move artifacts
       run: |
+        ls -lha *  # DEBUG
         cd dist
+        ls -lha *  # DEBUG
         for i in * ; do mv "$i"/* . ; rmdir "$i"; done
 
+    - name: Generate release notes
+      if: ${{ env.GITEA_ACTIONS == 'true' }}  # Gitea only
+      run: |
+        PREV_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
+        if [ -n "$PREV_TAG" ]; then
+          git log --oneline "${PREV_TAG}..${{ github.ref_name }}" > NOTES.md
+        else
+          git log --oneline ${{ github.ref_name }} > NOTES.md
+        fi
+        echo -e "\n= = =\nRelease notes:\n-------------"
+        cat NOTES.md
+
+    - name: Install gitea-cli (gt)
+      if: ${{ env.GITEA_ACTIONS == 'true' }}  # Gitea only
+      run: |
+        #URL="https://dl.gitea.com/gitea-cli"
+        URL="http://github-cache.socket.lc/cache"
+        VERSION=$(curl -fsSL $URL/version.json | jq -r '.latest.version')
+        ARCH=$(dpkg --print-architecture)
+        #curl -fsSL -o /tmp/gitea-cli.deb "${URL}/${VERSION}/gitea-cli_${VERSION}_${ARCH}.deb"
+        curl -fsSL -o /tmp/gitea-cli.deb "${URL}/gitea-cli_${VERSION}_${ARCH}.deb"
+        apt-get install -y /tmp/gitea-cli.deb
+
     # See https://cli.github.com/manual/gh_release_create
-    - name: Create Release
+    - name: Create Release (Gitea)
+      if: ${{ env.GITEA_ACTIONS == 'true' }}  # Gitea only
+      env:
+        GITEA_TOKEN: ${{ gitea.token }}
+        GITEA_CLI_HOST: ${{ gitea.server_url }}
+        GITEA_CLI_REPO: ${{ gitea.repository }}
+      run: >
+        gt release create ${{ github.ref_name }}
+        --title "${{ github.ref_name }}"
+        --notes-file NOTES.md
+        ./dist/*
+      # (--generate-notes - not supported on Gitea!)
+      # --notes-from-tag - just put the commit message only for this tag in the notes
+      # -F, --notes-file <file> - read release notes from file (use "-" to read from standard input)
+      # -n, --notes <string> - provide notes manually
+      # -d, --draft - save the release as a draft instead of publishing it
+      # -p, --prerelease - mark the release as a prerelease
+
+    # See https://cli.github.com/manual/gh_release_create
+    - name: Create Release (Github)
+      if: ${{ env.GITEA_ACTIONS != 'true' }}  # Github only
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: >
