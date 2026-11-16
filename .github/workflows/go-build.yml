@@ -8,6 +8,7 @@ on:
     tags:  # v*** to publish, v***-<anything> - prerelease
       - v*
     branches:  # For tags, publish them; for normal commits, just build and test
+      - master
       - main
 
 jobs:
