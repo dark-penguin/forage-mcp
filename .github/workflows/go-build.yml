@@ -5,7 +5,7 @@ env:
 
 on:
   push:
-    tags:
+    tags:  # v*** to publish, v***-pre - prerelease
       - v*
     #branches:
     #  - main
@@ -39,6 +39,7 @@ jobs:
         echo "github.event_name = ${{ github.event_name }}"
         echo "github.base_ref   = ${{ github.base_ref }}"
         echo "github.head_ref   = ${{ github.head_ref }}"
+        echo "github.api_url    = ${{ github.api_url }}"
 
     - name: Checkout code
       uses: actions/checkout@v4
@@ -95,74 +96,41 @@ jobs:
       #  fetch-depth: 0
       # This means "with all history"! But not necessary for changelogs!
 
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: dist/
-    # This automatically extracts files into dist/myproject-linux-amd64.tar.gz.zip/myproject-linux-amd64.tar.gz !
-
-    - name: Move artifacts
-      run: |
-        ls -lha *  # DEBUG
-        cd dist
-        ls -lha *  # DEBUG
-        for i in * ; do mv "$i"/* . ; rmdir "$i"; done
-
     - name: Generate release notes
-      if: ${{ env.GITEA_ACTIONS == 'true' }}  # Gitea only
       run: |
         PREV_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
         if [ -n "$PREV_TAG" ]; then
-          git log --oneline "${PREV_TAG}..${{ github.ref_name }}" > NOTES.md
+          git log --oneline "${PREV_TAG}..${{ github.ref_name }}" > NOTES.md  # Changes since last tag
         else
-          git log --oneline ${{ github.ref_name }} > NOTES.md
+          git log --oneline ${{ github.ref_name }} > NOTES.md  # Only current commit headline
         fi
         echo -e "\n= = =\nRelease notes:\n-------------"
         cat NOTES.md
 
-    - name: Install gitea-cli (gt)
-      if: ${{ env.GITEA_ACTIONS == 'true' }}  # Gitea only
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: dist/
+        # Automatically extracts files into './dist/myproject-linux-amd64.tar.gz.zip/myproject-linux-amd64.tar.gz' !
+
+    - name: Move artifacts
       run: |
-        #URL="https://dl.gitea.com/gitea-cli"
-        URL="http://github-cache.socket.lc/cache"
-        VERSION=$(curl -fsSL $URL/version.json | jq -r '.latest.version')
-        ARCH=$(dpkg --print-architecture)
-        #curl -fsSL -o /tmp/gitea-cli.deb "${URL}/${VERSION}/gitea-cli_${VERSION}_${ARCH}.deb"
-        curl -fsSL -o /tmp/gitea-cli.deb "${URL}/gitea-cli_${VERSION}_${ARCH}.deb"
-        apt-get install -y /tmp/gitea-cli.deb
+        # echo -e "\nROOT DIRECTORY:\n==============="; ls -lha
+        cd dist
+        # echo -e "\nDIST DIRECTORY:\n==============="; ls -lha
+        echo -e "\nDIST DIRECTORY:\n==============="; ls -lha *
+        for i in * ; do mv "$i"/* . ; rmdir "$i"; done
 
-    # See https://cli.github.com/manual/gh_release_create
-    - name: Create Release (Gitea)
-      if: ${{ env.GITEA_ACTIONS == 'true' }}  # Gitea only
+    - name: Publish release
+      uses: softprops/action-gh-release@v3.0.3
       env:
-        GITEA_TOKEN: ${{ gitea.token }}
-        GITEA_CLI_HOST: ${{ gitea.server_url }}
-        GITEA_CLI_REPO: ${{ gitea.repository }}
-      run: >
-        gt release create ${{ github.ref_name }}
-        --title "${{ github.ref_name }}"
-        --notes-file NOTES.md
-        ./dist/*
-      # (--generate-notes - not supported on Gitea!)
-      # --notes-from-tag - just put the commit message only for this tag in the notes
-      # -F, --notes-file <file> - read release notes from file (use "-" to read from standard input)
-      # -n, --notes <string> - provide notes manually
-      # -d, --draft - save the release as a draft instead of publishing it
-      # -p, --prerelease - mark the release as a prerelease
-
-    # See https://cli.github.com/manual/gh_release_create
-    - name: Create Release (Github)
-      if: ${{ env.GITEA_ACTIONS != 'true' }}  # Github only
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: >
-        gh release create ${{ github.ref_name }}
-        --title "${{ github.ref_name }}"
-        --generate-notes
-        ./dist/*
-      # --generate-notes - attach a link to the commits since the last release
-      # --notes-from-tag - just put the commit message only for this tag in the notes
-      # -F, --notes-file <file> - read release notes from file (use "-" to read from standard input)
-      # -n, --notes <string> - provide notes manually
-      # -d, --draft - save the release as a draft instead of publishing it
-      # -p, --prerelease - mark the release as a prerelease
+        GITHUB_API_URL: ${{ github.api_url }}
+      with:
+        token: ${{ github.token }}
+        tag_name: ${{ github.ref_name }}
+        name: ${{ github.ref_name }}
+        files: ./dist/*
+        # generate_release_notes: true  # Not supported by Gitea!
+        body_path: NOTES.md
+        prerelease: ${{ endsWith(github.ref_name, '-pre') }}  # true - mark the release as a prerelease
+        # draft: true  # Save the release as a draft instead of publishing it
