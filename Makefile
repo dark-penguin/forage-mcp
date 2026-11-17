@@ -1,12 +1,12 @@
 .PHONY: build test clean
 
 build:
-	go build -ldflags "-X main.version=$$(git describe --tags --always)" \
-		-o ./bin/forage-mcp$$(go env GOEXE) \
-		./cmd/forage-mcp
+	go build -v -o bin/ -ldflags "-s -w -X main.version=$$(git describe --tags --always)" ./...
 
 test:
-	go test ./...
+	go vet ./...
+	go test -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
 
 clean:
-	rm -rf bin/
+	rm -rf bin/ coverage.out
