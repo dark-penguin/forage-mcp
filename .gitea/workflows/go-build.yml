@@ -10,6 +10,7 @@ on:
     branches:  # For tags, publish them; for normal commits, just build and test
       - master
       - main
+      - dev
 
 jobs:
   checks:
@@ -41,12 +42,15 @@ jobs:
           - os: ubuntu-latest
             suffix: linux-amd64.tgz
             format: tar
+            go-prefix: /opt/hostedtoolcache
           # - os: windows-latest
           #   suffix: windows-amd64.zip
           #   format: zip
+          #   go-prefix: C:/hostedtoolcache/windows
           # - os: macos-latest
           #   suffix: darwin-amd64.tgz
           #   format: tar
+          #   go-prefix: /opt/hostedtoolcache
 
     steps:
     - name: "DEBUG: dump context variables"
@@ -62,11 +66,29 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v7
 
+    - name: Determine Go version
+      shell: bash  # Windows runners on Github have Git Bash!
+      run: |
+        GO_VERSION=$(sed -n 's/^go \([0-9.]*\)$/\1/p' go.mod)
+        echo "GO_VERSION=$GO_VERSION" | tee -a "$GITHUB_ENV"
+      # Separately - to capture the error if go.mod is not found
+
+    - name: Restore Go from cache
+      uses: actions/cache@v4
+      with:
+        # setup-go looks for Go here (and a .complete marker that marks that it's fully installed!)
+        path: |
+          ${{ matrix.go-prefix }}/go/${{ env.GO_VERSION }}/x64  
+          ${{ matrix.go-prefix }}/go/${{ env.GO_VERSION }}/x64.complete
+        key: go-${{ runner.os }}-${{ runner.arch }}-${{ env.GO_VERSION }}
+        # Those paths will be restored if a job with the same key already created the cache
+
     - name: Set up Go
       uses: actions/setup-go@v7
       with:
-        go-version: "${{ env.GO_VERSION }}"
-        cache: true
+        go-version-file: 'go.mod'        # Get Go version from the project
+        check-latest: true               # Install 1.23.4 if 1.23 is specified
+        cache-dependency-path: 'go.sum'  # Files to hash and use as cache key (e.g. list of deps)
 
     - name: Test
       run: make test
