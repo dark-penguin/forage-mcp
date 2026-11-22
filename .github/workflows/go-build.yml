@@ -23,14 +23,14 @@ jobs:
       run: |
         # Add '-u' to see more lines around the changes
         echo -e "\nOffending differences:\n======================"
-        if diff \
+        if diff -u \
           <(sed -E 's/^(\s*)# ?/\1/' .gitea/workflows/go-build.yml) \
           <(sed -E 's/^(\s*)# ?/\1/' .github/workflows/go-build.yml)
         then echo "None"
         else echo -e "\eWorkflows are different!"; exit 1
         fi
         echo -e "\nAllowed differences:\n===================="
-        diff .gitea/workflows/go-build.yml .github/workflows/go-build.yml || true
+        diff -u .gitea/workflows/go-build.yml .github/workflows/go-build.yml || true
 
   build:
     needs: checks
@@ -40,17 +40,17 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            go-prefix: /opt/hostedtoolcache
+            command: tar zcvf
             suffix: linux-amd64.tgz
-            format: tar
-            go-prefix: /opt/hostedtoolcache
           - os: windows-latest
-            suffix: windows-amd64.zip
-            format: zip
             go-prefix: C:/hostedtoolcache/windows
+            command: 7z a -tzip
+            suffix: windows-amd64.zip
           - os: macos-latest
-            suffix: darwin-amd64.tgz
-            format: tar
             go-prefix: /opt/hostedtoolcache
+            command: tar zcvf
+            suffix: darwin-amd64.tgz
 
     steps:
     - name: "DEBUG: dump context variables"
@@ -74,11 +74,12 @@ jobs:
       # Separately - to capture the error if go.mod is not found
 
     - name: Restore Go from cache
+      if: matrix.os != 'windows-latest'  # This will cause Windows to fail: github.com/actions/setup-go/pull/816
       uses: actions/cache@v4
       with:
         # setup-go looks for Go here (and a .complete marker that marks that it's fully installed!)
         path: |
-          ${{ matrix.go-prefix }}/go/${{ env.GO_VERSION }}/x64  
+          ${{ matrix.go-prefix }}/go/${{ env.GO_VERSION }}/x64
           ${{ matrix.go-prefix }}/go/${{ env.GO_VERSION }}/x64.complete
         key: go-${{ runner.os }}-${{ runner.arch }}-${{ env.GO_VERSION }}
         # Those paths will be restored if a job with the same key already created the cache
@@ -96,21 +97,14 @@ jobs:
     - name: Build
       run: make build
 
-    - name: Archive (Linux/Mac)
-      if: matrix.format == 'tar'
+    - name: Archive
+      shell: bash  # Windows runners on Github have Git Bash!
       run: |
         REPO_NAME="${GITHUB_REPOSITORY#*/}"                     # Strip owner name
         echo "REPO_NAME=${REPO_NAME}" | tee -a "${GITHUB_ENV}"  # Save into env-file (NO '' HERE!)
-        cd bin && tar zcvf ../${REPO_NAME}-${{ matrix.suffix }} *
+        cd bin && ${{ matrix.command }} ../${REPO_NAME}-${{ matrix.suffix }} *
 
-    - name: Archive (Windows)
-      if: matrix.format == 'zip'
-      run: |
-        $repo = $env:GITHUB_REPOSITORY.Split('/')[-1]  # Strip owner name
-        "REPO_NAME=$repo" >> $env:GITHUB_ENV           # Save into env-file
-        cd bin && powershell Compress-Archive -Path * -DestinationPath "../$repo-${{ matrix.suffix }}"
-
-    # This will automatically zip the files before uploading!
+    # Zips when uploading, then unzips when downloading
     - name: Upload artifact
       uses: actions/upload-artifact@v7
       with:
